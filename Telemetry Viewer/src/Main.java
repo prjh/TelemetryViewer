@@ -15,8 +15,9 @@ public class Main {
 		NotificationsView notificationsRegion = new NotificationsView();
 		SettingsView settingsRegion = new SettingsView();
 		ControlsRegion controlsRegion = new ControlsRegion(settingsRegion);
+		System.out.print("Init OpenGL... ");
 		OpenGLChartsRegion chartsRegion = new OpenGLChartsRegion(settingsRegion, controlsRegion);
-		
+		System.out.println("Done.");
 		window.setLayout(new BorderLayout());
 		window.add(notificationsRegion, BorderLayout.NORTH);
 		window.add(chartsRegion, BorderLayout.CENTER);

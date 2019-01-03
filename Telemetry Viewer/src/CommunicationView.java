@@ -17,7 +17,7 @@ public class CommunicationView extends JPanel {
 	JButton connectButton;
 
 	/**
-	 * Creates the lower-right corner toolbar with UART/TCP/UDP/Test controls and registers their event handlers.
+	 * Creates the lower-right corner toolbar with UART/WS/TCP/UDP/Test controls and registers their event handlers.
 	 */
 	public CommunicationView () {
 		
@@ -154,28 +154,32 @@ public class CommunicationView extends JPanel {
 		// hide or disable widgets based on the port type
 		CommunicationController.addPortListener(newPort -> {
 			if(newPort.startsWith(Communication.PORT_UART)) {
+				//System.out.println("Uart");
 				wsIpTextfield.setVisible(false);
 				baudRateCombobox.setVisible(true);
 				portNumberCombobox.setVisible(false);
 				sampleRateTextfield.setEditable(true);
 			} else if(newPort.equals(Communication.PORT_TEST)) {
+				//System.out.println("Test");
 				wsIpTextfield.setVisible(false);
 				baudRateCombobox.setVisible(false);
 				portNumberCombobox.setVisible(false);
 				sampleRateTextfield.setText("10000");
 				sampleRateTextfield.setEditable(false);
-			} else if(newPort.startsWith("WS ")) {
-				System.out.println("WS!!");
-				baudRateCombobox.setVisible(false);
+			} else if(newPort.equals(Communication.PORT_WS)) {
+				//System.out.println("WS");
+				portNumberCombobox.setVisible(false);	//!!
+				baudRateCombobox.setVisible(false);		//!!
 				portNumberCombobox.setVisible(true);
 				wsIpTextfield.setVisible(true);
 				sampleRateTextfield.setEditable(true);
 			} else {
+				//System.out.println("else");
 				baudRateCombobox.setVisible(false);
 				portNumberCombobox.setVisible(false);	//!!
 				wsIpTextfield.setVisible(false);
 				sampleRateTextfield.setEditable(true);
-				portNumberCombobox.setVisible(true);	//!!
+				portNumberCombobox.setVisible(true);
 			}
 		});
 		

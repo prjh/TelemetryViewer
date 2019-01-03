@@ -470,7 +470,7 @@ public class CommunicationController {
     	}
     }
 	
-	static Thread wsClientThread;
+	static Thread wsClientThread = null;
 	private static WebSocketClient wsClient;
 	/**
 	 * Spawns a TCP server and shows a DataStructureWindow if necessary.
