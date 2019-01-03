@@ -331,6 +331,7 @@ public class Controller {
 			outputFile.println("\ttcp/udp port number = " + CommunicationController.getPortNumber());
 			outputFile.println("\tpacket type = " +         CommunicationController.getPacketType());
 			outputFile.println("\tsample rate = " +         CommunicationController.getSampleRate());
+			outputFile.println("\tws-server ip = " +        CommunicationController.getWsServerIp());
 			outputFile.println("");
 			
 			outputFile.println(Model.datasets.size() + " Data Structure Locations:");
@@ -452,10 +453,11 @@ public class Controller {
 			int tcpUdpPort =       (int) ChartUtils.parse(n, lines.get(n++), "\ttcp/udp port number = %d");
 			String packetType = (String) ChartUtils.parse(n, lines.get(n++), "\tpacket type = %s");
 			int sampleRate =       (int) ChartUtils.parse(n, lines.get(n++), "\tsample rate = %d");
+			String wsServerIp = (String) ChartUtils.parse(n, lines.get(n++), "\tws-server ip = %d");
 			ChartUtils.parse(n, lines.get(n++), "");
 			
 			if(!Arrays.asList(CommunicationController.getPacketTypes()).contains(packetType))
-				throw new AssertionError("Line " + (n - 3) + ": Invalid packet type.");
+				throw new AssertionError("Line " + (n - 4) + ": Invalid packet type.");
 			
 			CommunicationController.setPort(portName);
 			CommunicationController.setBaudRate(baudRate);

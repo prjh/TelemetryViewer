@@ -6,12 +6,19 @@ import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
+
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.drafts.Draft;
+import org.java_websocket.drafts.Draft_6455;
+import org.java_websocket.handshake.ServerHandshake;
 
 import com.fazecast.jSerialComm.SerialPort;
 
@@ -46,6 +53,7 @@ public class CommunicationController {
 		
 		// sanity check
 		if(!newPort.startsWith(Communication.PORT_UART + ": ") &&
+		   !newPort.equals(Communication.PORT_WS)  &&
 		   !newPort.equals(Communication.PORT_TCP) &&
 		   !newPort.equals(Communication.PORT_UDP) &&
 		   !newPort.equals(Communication.PORT_TEST))
@@ -71,7 +79,7 @@ public class CommunicationController {
 	}
 	
 	/**
-	 * Gets names for every supported port (every serial port + TCP + UDP + Test)
+	 * Gets names for every supported port (every serial port + WS + TCP + UDP + Test)
 	 * These should be listed in a dropdown box for the user to choose from.
 	 *  
 	 * @return    A String[] of port names.
@@ -79,11 +87,12 @@ public class CommunicationController {
 	public static String[] getPorts() {
 		
 		SerialPort[] ports = SerialPort.getCommPorts();
-		String[] names = new String[ports.length + 3];
+		String[] names = new String[ports.length + 4];
 		
 		for(int i = 0; i < ports.length; i++)
 			names[i] = "UART: " + ports[i].getSystemPortName();
 		
+		names[names.length - 4] = Communication.PORT_WS;
 		names[names.length - 3] = Communication.PORT_TCP;
 		names[names.length - 2] = Communication.PORT_UDP;
 		names[names.length - 1] = Communication.PORT_TEST;
@@ -243,19 +252,19 @@ public class CommunicationController {
 	}
 	
 	/**
-	 * Registers a listener that will be notified when the TCP/UDP port number changes, and triggers an event to ensure the GUI is in sync.
+	 * Registers a listener that will be notified when the TCP/UDP/WS port number changes, and triggers an event to ensure the GUI is in sync.
 	 * 
 	 * @param listener    The listener to be notified.
 	 */
 	public static void addPortNumberListener(Consumer<Integer> listener) {
 		
 		portNumberListeners.add(listener);
-		setPortNumber(Communication.tcpUdpPort);
+		setPortNumber(Communication.tcpUdpWsPort);
 		
 	}
 	
 	/**
-	 * Changes the TCP/UDP port number, and notifies any listeners. The number will be clipped if it is outside the 0-65535 range.
+	 * Changes the TCP/UDP/WS port number, and notifies any listeners. The number will be clipped if it is outside the 0-65535 range.
 	 * If a connection currently exists, it will be closed first.
 	 * 
 	 * @param newPort    Port number.
@@ -272,9 +281,18 @@ public class CommunicationController {
 		disconnect();
 		
 		// set and notify
-		Communication.tcpUdpPort = newPort;		
+		Communication.tcpUdpWsPort = newPort;		
 		for(Consumer<Integer> listener : portNumberListeners)
-			listener.accept(Communication.tcpUdpPort);
+			listener.accept(Communication.tcpUdpWsPort);
+		
+	}
+	
+	/**
+	 * @return    The current WebSocket ServerIP as string.
+	 */
+	public static String getWsServerIp() {
+		
+		return Communication.wsServerIp;
 		
 	}
 	
@@ -283,7 +301,7 @@ public class CommunicationController {
 	 */
 	public static int getPortNumber() {
 		
-		return Communication.tcpUdpPort;
+		return Communication.tcpUdpWsPort;
 		
 	}
 	
@@ -317,6 +335,7 @@ public class CommunicationController {
 			if(Communication.port.startsWith(Communication.PORT_UART))  listener.accept(Communication.uartConnected);
 			else if(Communication.port.equals(Communication.PORT_TCP))  listener.accept(Communication.tcpConnected);
 			else if(Communication.port.equals(Communication.PORT_UDP))  listener.accept(Communication.udpConnected);
+			else if(Communication.port.equals(Communication.PORT_WS))   listener.accept(Communication.wsConnected);
 			else if(Communication.port.equals(Communication.PORT_TEST)) listener.accept(Communication.testConnected);
 		
 	}
@@ -329,6 +348,7 @@ public class CommunicationController {
 		if(Communication.port.startsWith(Communication.PORT_UART))  return Communication.uartConnected;
 		else if(Communication.port.equals(Communication.PORT_TCP))  return Communication.tcpConnected;
 		else if(Communication.port.equals(Communication.PORT_UDP))  return Communication.udpConnected;
+		else if(Communication.port.equals(Communication.PORT_WS))   return Communication.wsConnected;
 		else if(Communication.port.equals(Communication.PORT_TEST)) return Communication.testConnected;
 		else                                                        return false;
 		
@@ -347,6 +367,8 @@ public class CommunicationController {
 			startTcpServer(parentWindow);
 		else if(Communication.port.equals(Communication.PORT_UDP))
 			startUdpServer(parentWindow);
+		else if(Communication.port.equals(Communication.PORT_WS))
+			startWsClient(parentWindow);
 		else if(Communication.port.equals(Communication.PORT_TEST))
 			startTester(parentWindow);
 		
@@ -363,6 +385,8 @@ public class CommunicationController {
 			stopTcpServer();
 		else if(Communication.port.equals(Communication.PORT_UDP))
 			stopUdpServer();
+		else if(Communication.port.equals(Communication.PORT_WS))
+			stopWsClient();
 		else if(Communication.port.equals(Communication.PORT_TEST))
 			stopTester();
 		
@@ -430,6 +454,103 @@ public class CommunicationController {
 		
 	}
 	
+    private static void readData (String line) {
+    	//---------------------------------------------------------- SDG --
+    	// parse received text
+    	try {
+		//String line = reader.readLine();
+		String[] tokens = line.split(",");
+		// ensure they can all be parsed as floats before populating the datasets
+		for(Dataset dataset : Controller.getAllDatasets())
+			Float.parseFloat(tokens[dataset.location]);
+		for(Dataset dataset : Controller.getAllDatasets())
+			dataset.add(Float.parseFloat(tokens[dataset.location]));
+    	} catch (Exception e) {
+    	   System.out.println("Float parse exception");	
+    	}
+    }
+	
+	static Thread wsClientThread;
+	private static WebSocketClient wsClient;
+	/**
+	 * Spawns a TCP server and shows a DataStructureWindow if necessary.
+	 * 
+	 * @param parentWindow    If not null, a DataStructureWindow will be shown and centered on this JFrame.
+	 */
+	private static void startWsClient(JFrame parentWindow) {
+		
+		wsClientThread = new Thread(() -> {
+			
+			String uriStr = "ws://"+Communication.wsServerIp+":" + Communication.tcpUdpWsPort;
+			System.out.println(uriStr);
+			URI uri=null;
+			try {
+			  uri = new URI(uriStr);
+			} catch ( URISyntaxException ex ) {
+			  System.out.println(uriStr+": is not a valid WebSocket URI\n" );
+			  return;
+			}
+  		    wsClient = new WebSocketClient(uri, (Draft)new Draft_6455()) { 
+  		        @Override
+	  		    public void onMessage(String message) {
+	  				System.out.println("WS got:          " + message);
+	  				readData(message);
+	  			}
+	  			@Override 
+	  			public void onOpen(ServerHandshake handshake ) {
+	  				System.out.println("WS connected to: " + getURI() + "\n" );
+					Communication.wsConnected = true;
+					notifyConnectionListeners();
+					if(parentWindow != null)
+						Communication.packet.showDataStructureWindow(parentWindow, false);
+					
+					int oldSampleCount = Controller.getSamplesCount();
+					NotificationsController.showSuccessUntil("The WS client is connected. Receiving telemetry from ws://"+Communication.wsServerIp + ":" + Communication.tcpUdpWsPort, () -> Controller.getSamplesCount() > oldSampleCount, true);
+	  			}
+	  			@Override
+	  			public void onClose(int code, String reason, boolean remote) {
+	  				System.out.println("WS disconn.from: " + getURI() + "; Code: " + code + " " + reason + "\n" );
+			  		if(wsClient!=null) wsClient.close();
+					SwingUtilities.invokeLater(() -> disconnect()); // invokeLater to prevent a deadlock
+					wsClient = null;
+	  			}
+	  			@Override
+	  			public void onError(Exception ex ) {
+	  				System.out.println("WS Exception:    " + ex + "\n" );
+					NotificationsController.showFailureForSeconds("Unable to start the WS Client. Make sure WS-Server "+getURI()+" is running!", 5, false);
+					if (wsClient!=null) wsClient.close();
+					SwingUtilities.invokeLater(() -> disconnect()); // invokeLater to prevent a deadlock
+					wsClient = null;
+	  			}
+	  		  };
+	  		  wsClient.connect();
+		});
+		
+		wsClientThread.setPriority(Thread.MAX_PRIORITY);
+		wsClientThread.setName("WS Client");
+		wsClientThread.start();
+		
+	}
+	
+	/**
+	 * Stops the WS Client thread, frees its resources, and notifies any listeners that the connection has been closed.
+	 */
+	private static void stopWsClient() {
+			
+		if(wsClientThread != null && wsClientThread.isAlive()) {
+			wsClientThread.interrupt();
+			while(wsClientThread.isAlive()); // wait
+		}
+		
+		Communication.packet.stopReceivingData();
+		if (wsClient!=null) wsClient.close();
+
+		Communication.wsConnected = false;
+		notifyConnectionListeners();
+		
+	}
+	
+	
 	static Thread tcpServerThread;
 	
 	/**
@@ -446,10 +567,10 @@ public class CommunicationController {
 			
 			// start the TCP server
 			try {
-				tcpServer = new ServerSocket(Communication.tcpUdpPort);
+				tcpServer = new ServerSocket(Communication.tcpUdpWsPort);
 				tcpServer.setSoTimeout(1000);
 			} catch (Exception e) {
-				NotificationsController.showFailureForSeconds("Unable to start the TCP server. Make sure another program is not already using port " + Communication.tcpUdpPort + ".", 5, false);
+				NotificationsController.showFailureForSeconds("Unable to start the TCP server. Make sure another program is not already using port " + Communication.tcpUdpWsPort + ".", 5, false);
 				try { tcpServer.close(); } catch(Exception e2) {}
 				SwingUtilities.invokeLater(() -> disconnect()); // invokeLater to prevent a deadlock
 				return;
@@ -462,7 +583,7 @@ public class CommunicationController {
 				Communication.packet.showDataStructureWindow(parentWindow, false);
 			
 			int oldSampleCount = Controller.getSamplesCount();
-			NotificationsController.showSuccessUntil("The TCP server is running. Send telemetry to " + Communication.localIp + ":" + Communication.tcpUdpPort, () -> Controller.getSamplesCount() > oldSampleCount, true);
+			NotificationsController.showSuccessUntil("The TCP server is running. Send telemetry to " + Communication.localIp + ":" + Communication.tcpUdpWsPort, () -> Controller.getSamplesCount() > oldSampleCount, true);
 			
 			// wait for a connection
 			while(true) {
@@ -564,12 +685,12 @@ public class CommunicationController {
 			
 			// start the UDP server
 			try {
-				udpServer = new DatagramSocket(Communication.tcpUdpPort);
+				udpServer = new DatagramSocket(Communication.tcpUdpWsPort);
 				udpServer.setSoTimeout(1000);
 				stream = new PipedOutputStream();
 				inputStream = new PipedInputStream(stream);
 			} catch (Exception e) {
-				NotificationsController.showFailureForSeconds("Unable to start the UDP server. Make sure another program is not already using port " + Communication.tcpUdpPort + ".", 5, false);
+				NotificationsController.showFailureForSeconds("Unable to start the UDP server. Make sure another program is not already using port " + Communication.tcpUdpWsPort + ".", 5, false);
 				try { udpServer.close(); stream.close(); inputStream.close(); } catch(Exception e2) {}
 				SwingUtilities.invokeLater(() -> disconnect()); // invokeLater to prevent a deadlock
 				return;
@@ -582,7 +703,7 @@ public class CommunicationController {
 				Communication.packet.showDataStructureWindow(parentWindow, false);
 				
 			int oldSampleCount = Controller.getSamplesCount();
-			NotificationsController.showSuccessUntil("The UDP server is running. Send telemetry to " + Communication.localIp + ":" + Communication.tcpUdpPort, () -> Controller.getSamplesCount() > oldSampleCount, true);
+			NotificationsController.showSuccessUntil("The UDP server is running. Send telemetry to " + Communication.localIp + ":" + Communication.tcpUdpWsPort, () -> Controller.getSamplesCount() > oldSampleCount, true);
 			
 			Communication.packet.startReceivingData(inputStream);
 			

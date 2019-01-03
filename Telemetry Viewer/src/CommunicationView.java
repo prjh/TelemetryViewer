@@ -66,6 +66,11 @@ public class CommunicationView extends JPanel {
 			portCombobox.addItem(newPort);
 			portCombobox.setSelectedItem(newPort);
 		});
+		// WS Ip address
+		JTextField wsIpTextfield = new JTextField("192.168.100.100");
+		wsIpTextfield.setMinimumSize(wsIpTextfield.getPreferredSize());
+		wsIpTextfield.setMaximumSize(wsIpTextfield.getPreferredSize());
+		wsIpTextfield.setEditable(true);
 		
 		// UART baud rate
 		JComboBox<String> baudRateCombobox = new JComboBox<String>(CommunicationController.getBaudRateDefaults());
@@ -112,6 +117,7 @@ public class CommunicationView extends JPanel {
 		// connect/disconnect
 		connectButton = new JButton("Connect");
 		connectButton.addActionListener(event -> {
+			wsIpTextfield.setEnabled(false);
 			packetTypeCombobox.setEnabled(false);
 			portCombobox.setEnabled(false);
 			baudRateCombobox.setEnabled(false);
@@ -127,6 +133,7 @@ public class CommunicationView extends JPanel {
 		});
 		CommunicationController.addConnectionListener(connected -> {
 			if(connected) {
+				wsIpTextfield.setEnabled(false);
 				packetTypeCombobox.setEnabled(false);
 				portCombobox.setEnabled(false);
 				baudRateCombobox.setEnabled(false);
@@ -134,6 +141,7 @@ public class CommunicationView extends JPanel {
 				connectButton.setEnabled(true);
 				connectButton.setText("Disconnect");
 			} else {
+				wsIpTextfield.setEnabled(true);
 				packetTypeCombobox.setEnabled(true);
 				portCombobox.setEnabled(true);
 				baudRateCombobox.setEnabled(true);
@@ -146,18 +154,28 @@ public class CommunicationView extends JPanel {
 		// hide or disable widgets based on the port type
 		CommunicationController.addPortListener(newPort -> {
 			if(newPort.startsWith(Communication.PORT_UART)) {
+				wsIpTextfield.setVisible(false);
 				baudRateCombobox.setVisible(true);
 				portNumberCombobox.setVisible(false);
 				sampleRateTextfield.setEditable(true);
 			} else if(newPort.equals(Communication.PORT_TEST)) {
+				wsIpTextfield.setVisible(false);
 				baudRateCombobox.setVisible(false);
 				portNumberCombobox.setVisible(false);
 				sampleRateTextfield.setText("10000");
 				sampleRateTextfield.setEditable(false);
-			} else {
+			} else if(newPort.startsWith("WS ")) {
+				System.out.println("WS!!");
 				baudRateCombobox.setVisible(false);
 				portNumberCombobox.setVisible(true);
+				wsIpTextfield.setVisible(true);
 				sampleRateTextfield.setEditable(true);
+			} else {
+				baudRateCombobox.setVisible(false);
+				portNumberCombobox.setVisible(false);	//!!
+				wsIpTextfield.setVisible(false);
+				sampleRateTextfield.setEditable(true);
+				portNumberCombobox.setVisible(true);	//!!
 			}
 		});
 		
@@ -171,6 +189,7 @@ public class CommunicationView extends JPanel {
 		add(Box.createHorizontalStrut(5));
 		add(portCombobox);
 		add(Box.createHorizontalStrut(5));
+		add(wsIpTextfield);
 		add(baudRateCombobox);
 		add(portNumberCombobox);
 		add(Box.createHorizontalStrut(5));

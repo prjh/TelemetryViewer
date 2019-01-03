@@ -235,7 +235,7 @@ public class CsvPacket implements Packet {
 			BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
 			
 			while(true) {
-				
+				String   line="";
 				try {
 					
 					// wait for text to arrive
@@ -243,8 +243,9 @@ public class CsvPacket implements Packet {
 						Thread.sleep(1);
 					
 					// parse received text
-					String line = reader.readLine();
-					String[] tokens = line.split(",");
+					//String 
+				    line = reader.readLine();
+				    String[] tokens = line.split(",");
 					// ensure they can all be parsed as floats before populating the datasets
 					for(Dataset dataset : Controller.getAllDatasets())
 						Float.parseFloat(tokens[dataset.location]);
@@ -253,7 +254,7 @@ public class CsvPacket implements Packet {
 					
 				} catch(NumberFormatException | NullPointerException | ArrayIndexOutOfBoundsException | SocketTimeoutException e1) {
 					
-					NotificationsController.showVerboseForSeconds("A corrupt or incomplete line was received.", 5, false);
+					NotificationsController.showVerboseForSeconds("A corrupt or incomplete line was received: "+ line, 5, false);
 					
 				} catch(IOException | InterruptedException e2) {
 					
